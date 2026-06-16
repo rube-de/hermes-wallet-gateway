@@ -1,0 +1,77 @@
+:root {
+  --bg: #170d02;
+  --amber: #ffac02;
+  --fg: #fff;
+  --hair: rgba(255, 172, 2, 0.22);
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+#root {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1.25rem;
+}
+.card {
+  width: 100%;
+  max-width: 26rem;
+  padding: 2.25rem 2rem;
+  background: color-mix(in srgb, #fff 2%, var(--bg));
+  border: 1px solid var(--hair);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.05),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.4),
+    0 24px 60px -20px rgba(0, 0, 0, 0.6);
+}
+.brand {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--amber);
+  font-size: 0.95rem;
+}
+h1 {
+  margin: 0 0 0.4rem;
+  font-size: 1.6rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.sub {
+  margin: 0 0 1.6rem;
+  color: color-mix(in srgb, var(--fg) 65%, transparent);
+  font-size: 0.95rem;
+}
+.row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+.signin {
+  width: 100%;
+  padding: 0.95rem 1rem;
+  background: var(--amber);
+  color: var(--bg);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  border: 0;
+  cursor: pointer;
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.5),
+    inset -1px -1px 0 rgba(0, 0, 0, 0.5);
+}
+.signin:hover { filter: brightness(1.08); }
+.signin:disabled { opacity: 0.6; cursor: default; }
+.err {
+  margin-top: 1rem;
+  color: #ff6b6b;
+  font-size: 0.85rem;
+}

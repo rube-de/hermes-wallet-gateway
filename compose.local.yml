@@ -1,0 +1,44 @@
+# Local smoke-test stack: the gateway + a mock upstream (the static mock dashboard).
+# No Hermes image, no API keys, no wallet extension needed.
+#
+#   docker compose -f compose.local.yml up --build -d
+#   cd gateway && npm install && node test/smoke.ts       # headless SIWE checks
+#   # or open http://localhost:8080 in a browser with MetaMask (whitelist your addr below)
+#   docker compose -f compose.local.yml down
+#
+# The whitelisted address below is Hardhat dev account #0 (the headless test
+# signs as it). Add your own MetaMask address to test in a browser.
+
+services:
+  wallet-gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+      args:
+        # Free id from https://cloud.reown.com — needed for WalletConnect/mobile.
+        # Injected wallets work without it.
+        VITE_WC_PROJECT_ID: ${VITE_WC_PROJECT_ID:-}
+        VITE_CHAIN_ID: ${WALLET_CHAIN_ID:-1}
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - HERMES_TARGET=http://mock-upstream:80
+      # Accept both localhost and 127.0.0.1 — they are SEPARATE browser origins,
+      # so the wallet signs whichever host is in the address bar. Prod sets one.
+      - WALLET_DOMAIN=${WALLET_DOMAIN:-localhost:8080,127.0.0.1:8080}
+      - COOKIE_SECURE=false          # local http; production keeps this true
+      - WALLET_CHAIN_ID=1
+      - WALLET_SESSION_SECRET=local-dev-secret-not-for-production-0123456789abcdef
+      # Override with your MetaMask address for a browser test:
+      #   WALLET_WHITELIST=0xYourAddress docker compose -f compose.local.yml up --build
+      - WALLET_WHITELIST=${WALLET_WHITELIST:-0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266}
+    depends_on:
+      - mock-upstream
+
+  mock-upstream:
+    # Tiny static "dashboard" with a Log out button (POSTs /siwe/logout, which
+    # the gateway intercepts). Lets you test connect -> sign -> logout from the UI.
+    image: nginx:alpine
+    volumes:
+      - ./mock-dashboard:/usr/share/nginx/html:ro

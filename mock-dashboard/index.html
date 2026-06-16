@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mock dashboard — Hermes wallet gate</title>
+<style>
+  :root { --bg:#170d02; --amber:#ffac02; --fg:#fff; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; min-height:100vh; background:var(--bg); color:var(--fg);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  body { display:grid; place-items:center; padding:2rem; }
+  .card { max-width:30rem; text-align:center; padding:2.5rem 2.75rem;
+    border:1px solid rgba(255,172,2,.3); background:color-mix(in srgb,#fff 2%,var(--bg));
+    box-shadow:inset 1px 1px 0 rgba(255,255,255,.05), 0 24px 60px -20px rgba(0,0,0,.6); }
+  h1 { color:var(--amber); margin:0 0 .6rem; font-size:1.6rem; letter-spacing:.03em; }
+  p { color:color-mix(in srgb,var(--fg) 75%,transparent); margin:.3rem 0; }
+  .hint { font-size:.85rem; color:color-mix(in srgb,var(--fg) 50%,transparent); margin-top:.4rem; }
+  button { margin-top:1.5rem; padding:.8rem 1.6rem; background:var(--amber); color:var(--bg);
+    border:0; cursor:pointer; font-weight:700; font-size:.78rem; letter-spacing:.16em;
+    text-transform:uppercase; box-shadow:inset 1px 1px 0 rgba(255,255,255,.5),
+      inset -1px -1px 0 rgba(0,0,0,.5); }
+  button:hover { filter:brightness(1.08); }
+  button:disabled { opacity:.6; cursor:default; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>✅ Authenticated</h1>
+  <p>Your wallet passed the allowlist gate and reached the (mock) dashboard.</p>
+  <p class="hint">In production this is where the real Hermes dashboard renders.</p>
+  <button id="logout" type="button">Log out</button>
+</div>
+<script>
+  // /siwe/logout is a GATEWAY route — even though we're a proxied upstream,
+  // the gateway intercepts it (clears the session cookie) before proxying.
+  document.getElementById('logout').addEventListener('click', async function () {
+    this.disabled = true;
+    this.textContent = 'Logging out…';
+    try { await fetch('/siwe/logout', { method: 'POST', credentials: 'same-origin' }); }
+    finally { window.location.assign('/'); } // back to the login screen (no cookie now)
+  });
+</script>
+</body>
+</html>

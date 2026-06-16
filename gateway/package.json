@@ -1,0 +1,22 @@
+{
+  "name": "hermes-wallet-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SIWE + Ethereum-address-whitelist turnstile in front of the Hermes dashboard",
+  "engines": { "node": ">=23.6" },
+  "scripts": {
+    "start": "node src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node test/run-local.ts"
+  },
+  "dependencies": {
+    "http-proxy": "^1.18.1",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/http-proxy": "^1.17.15",
+    "@types/node": "^22.7.0",
+    "typescript": "^5.6.0"
+  }
+}
