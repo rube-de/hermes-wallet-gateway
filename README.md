@@ -1,117 +1,141 @@
-# hermes-dashboard-wallet
+# Hermes Wallet Gateway
 
-Wallet-gated public access to the [Hermes agent](https://github.com/nousresearch/hermes-agent)
-dashboard, deployed on **Oasis ROFL**. Visitors sign in with their Ethereum wallet
-(Sign-In-With-Ethereum / EIP-4361); the gateway verifies the signature, checks an address
-**allowlist**, and only whitelisted wallets reach the dashboard.
+A small, reusable **SIWE wallet-gate** you put in front of a stock
+[Hermes agent](https://github.com/nousresearch/hermes-agent) dashboard. Visitors sign in with
+their Ethereum wallet (Sign-In-With-Ethereum / EIP-4361); the gateway verifies the signature,
+checks an address **allowlist**, sets a signed session cookie, and only then reverse-proxies them
+to the dashboard. Built for **Oasis ROFL** (TDX TEE) but runs on any Docker host.
 
-The Hermes image is **never modified** — a small reverse-proxy gateway sits in front of the stock
-dashboard. Upgrading Hermes is just bumping an image digest. Full design rationale (including the
-in-tree-plugin alternative and the Oasis Sapphire confidential-allowlist upgrade) is in
-[`.claude/files/hermes-wallet-gate-architecture.md`](./.claude/files/hermes-wallet-gate-architecture.md).
+The Hermes image is **never modified** — the gateway sits in front of the stock dashboard, so
+upgrading Hermes is just bumping its image tag/digest.
+
+> **This repo is the gateway *component*, not a deployment.** It publishes the gateway image; you
+> consume that image from your own Hermes deployment repo (which holds the `compose.yaml` and the
+> `rofl.yaml` that `oasis rofl init` generates). See **[Using it](#using-it)**.
+
+Full design rationale (in-tree-plugin alternative, Sapphire confidential-allowlist upgrade) is in
+[`docs/architecture.md`](./docs/architecture.md).
 
 ## Architecture
 
 ```
-Internet --HTTPS--> ROFL port proxy (TLS in TEE) --> wallet-gateway (this repo)
+Internet --HTTPS--> ROFL port proxy (TLS in TEE) --> wallet-gateway  ← THIS REPO publishes this
                                                        |  SIWE + allowlist + session cookie
                                                        |  reverse-proxy + WebSocket passthrough
                                                        v
-                                              hermes-dashboard  (stock image, --insecure,
-                                                                 internal net, no public port)
+                                              hermes-dashboard  (stock image, internal net,
+                                                                 no public port)
                                               hermes-gateway    (stock image, agent runtime)
 ```
 
-- **ROFL port proxy** terminates TLS *inside the TEE* and gives you a public HTTPS URL — no
-  Caddy/Traefik needed.
-- **wallet-gateway** (Node + [viem](https://viem.sh)) does the SIWE handshake, allowlist check,
-  signed session cookie, and transparently proxies authenticated traffic (incl. WebSockets) to Hermes.
-- **hermes-dashboard / hermes-gateway** run the stock published image with no published port — the
+- **wallet-gateway** (Node + [viem](https://viem.sh)) — the only public service; does the SIWE
+  handshake, allowlist check, signed cookie, and transparently proxies authenticated traffic
+  (incl. WebSockets) to Hermes.
+- **hermes-dashboard / hermes-gateway** — stock published image with no published port; the
   gateway is the only thing that can reach them.
+- **ROFL port proxy** terminates TLS *inside the TEE* and hands you a public HTTPS URL — no
+  Caddy/Traefik needed.
 
-## Layout
+## Using it
 
+**One published image serves every deployment.** Chain id and WalletConnect project are injected
+into the login app at **runtime** (the gateway writes `window.__HERMES_GATE__` into the served
+`index.html`), so you configure with env vars — **no rebuild per deployment**.
+
+### 1. Point your deployment at the image
+
+Copy [`compose.yaml`](./compose.yaml) into your deployment repo. It already references the prebuilt
+public image `ghcr.io/rube-de/hermes-wallet-gateway:latest` (override with `GATEWAY_IMAGE=…`) and
+runs the two stock Hermes services with no published port. Set the runtime config (see
+[Configuration](#configuration)) via env / ROFL secrets, then **[deploy](#deploying-on-rofl)**.
+
+### 2. (Optional) Build & push your own image
+
+Only needed if you **fork the gateway code** — not to change WalletConnect project or chain (those
+are runtime). With [`just`](https://github.com/casey/just):
+
+```bash
+GATEWAY_IMAGE=ghcr.io/<your-org>/hermes-wallet-gateway:0.1.0 just push
 ```
-login-app/          RainbowKit + wagmi login page (Vite/React) — injected + WalletConnect/mobile
-  src/App.tsx       Connect + SIWE sign-in flow
-  src/main.tsx      wagmi/RainbowKit providers
-gateway/            the wallet-auth reverse proxy (Node, runs directly)
-  src/server.ts     http server: SIWE routes + serves the built login app + gated reverse proxy + WS
-  src/siwe.ts       nonce store + EIP-4361 verify + allowlist (is_allowed)
-  src/session.ts    stateless HMAC-signed session cookie
-  src/static.ts     serves login-app/dist (the SPA) under /__login/
-  src/config.ts     env-driven config
-  src/login-page.ts dependency-free fallback page (used only if login-app isn't built)
-compose.yaml        ROFL compose: gateway (published) + 2 stock Hermes services (internal)
-compose.local.yml   local smoke stack: gateway + mock upstream
+
+or directly:
+
+```bash
+# linux/amd64 is required for ROFL; --provenance=false keeps a clean single-arch
+# manifest. The Dockerfile builds the React app on the NATIVE builder arch, so
+# this cross-build is fast even on Apple Silicon.
+docker buildx build --platform linux/amd64 --provenance=false \
+  -f gateway/Dockerfile -t ghcr.io/<your-org>/hermes-wallet-gateway:0.1.0 --push .
 ```
 
-`rofl.yaml` is **not** in the repo — it's generated by `oasis rofl init` (and filled in by
-`oasis rofl create`/`update` with your app id, enclave hashes, and deployments). It's
-deployment-specific and gitignored.
+Then make the package **public** — ROFL cannot pull private images (it has no registry-credential
+mechanism): GitHub → Packages → your package → *Change visibility → Public*.
 
-The gateway builds the React login app in a multi-stage Docker build and serves it as
-static assets — deployment stays a single container.
+## Configuration
+
+| Var | Phase | Set via | Purpose |
+|-----|-------|---------|---------|
+| `WALLET_WHITELIST` | run | env / ROFL secret | Comma-separated allowed `0x` addresses. |
+| `WALLET_SESSION_SECRET` | run | env / ROFL secret | HMAC key for session cookies (`openssl rand -hex 32`). |
+| `WALLET_DOMAIN` | run | env / ROFL secret | Public host(s) SIWE binds to. Comma-separated set allowed. |
+| `WALLET_CHAIN_ID` | run | env | Chain the gateway verifies **and** injects into the login app. |
+| `WALLET_WC_PROJECT_ID` | run | env | WalletConnect/Reown project id (mobile/QR), injected into the login app. Empty = WalletConnect off (injected wallets still work). |
+| `WALLET_SESSION_TTL` | run | env | Session lifetime in seconds (default 43200 = 12h). |
+| `HERMES_TARGET` | run | env | Upstream dashboard URL (`http://hermes-dashboard:9119`). |
+| `COOKIE_SECURE` | run | env | `true` in prod (HTTPS); `false` only for local http. |
+| `VITE_WC_PROJECT_ID` / `VITE_CHAIN_ID` | build | `--build-arg` | **Fallback only** for `npm run dev` (no gateway in front). The runtime vars above take precedence. |
+
+The login app reads runtime config first, then the baked `VITE_*` fallback, then defaults — so a
+plain `npm run dev` still works, and a deployed image is fully configured by env.
 
 ## Local development
 
-Two ways to run the gateway against a mock upstream (no Hermes image needed):
-
-**Docker (builds the React login app too):**
-```bash
-# optional: a free WalletConnect id (https://cloud.reown.com) for mobile/QR.
-# Injected wallets (MetaMask, Rabby, ...) work without it.
-WALLET_WHITELIST=0xYourAddress VITE_WC_PROJECT_ID=<id> \
-  docker compose -f compose.local.yml up --build
-```
-
-**Node (build the login app once, then run):**
-```bash
-cd login-app && npm install && npm run build && cd ..
-cd gateway   && npm install
-WALLET_WHITELIST=0xYourAddress node test/dev.ts
-```
-
-Then open http://localhost:8080, connect a wallet whose address is in `WALLET_WHITELIST`, sign, and
-you land on the (mock) dashboard. Headless check (no browser): `node gateway/test/run-local.ts`.
-
-If you skip the `login-app` build, the gateway serves a dependency-free fallback page (injected
-wallets only) so it still works.
-
-## Deploy on ROFL
-
-Prereqs: the [Oasis CLI](https://docs.oasis.io/build/tools/cli/), a funded account, Docker, and a
-container registry.
+Run the gateway against a mock upstream — no Hermes image, no API keys, no wallet extension needed.
 
 ```bash
-# 1. Build & push the gateway image, pin it by digest in compose.yaml.
-#    Context is the repo ROOT (the build also compiles login-app/). Pass a
-#    WalletConnect id to enable mobile/QR in the RainbowKit modal.
-docker build -f gateway/Dockerfile --build-arg VITE_WC_PROJECT_ID=<id> \
-  -t ghcr.io/<you>/hermes-wallet-gateway:0.1.0 .
-docker push ghcr.io/<you>/hermes-wallet-gateway:0.1.0
-# replace the `build:` block with `image: ...@sha256:<digest>` in compose.yaml
-# and pin the two hermes-agent images by digest as well.
-
-# 2. Scaffold + register the ROFL app (generates the real rofl.yaml + app id)
-oasis rofl init
-oasis rofl create            # registers an app_id on Sapphire
-
-# 3. Set secrets (E2E-encrypted; only decrypt inside the attested TEE)
-openssl rand -hex 32 | tr -d '\n' | oasis rofl secret set WALLET_SESSION_SECRET -
-echo -n "0xAddr1,0xAddr2"     | oasis rofl secret set WALLET_WHITELIST -
-
-# 4. Deploy
-oasis rofl deploy            # add --show-offers to compare TDX node offers/pricing
-
-# 5. Get the public URL, then bind SIWE to it
-oasis rofl machine show      # -> https://p8080.m<id>.<...>.rofl.app
-echo -n "p8080.m<id>.<...>.rofl.app" | oasis rofl secret set WALLET_DOMAIN -
-oasis rofl update            # push the secret + redeploy
+just dev                 # http://127.0.0.1:8080  (gateway + mock dashboard)
+just dev wc=<reown-id>   # ...with WalletConnect/mobile QR enabled
 ```
 
-Custom domain: point a DNS `A` + `TXT` record at the proxy per the
-[port-proxy docs](https://docs.oasis.io/build/rofl/features/proxy/), then set `WALLET_DOMAIN` to it.
+Set the allowlist with `WALLET_WHITELIST=0xYourAddress just dev`. `compose.local.yml` accepts both
+`localhost:8080` and `127.0.0.1:8080` as SIWE domains (they're separate browser origins). Headless
+check (no browser): `just smoke`. Typecheck the login app: `just check`.
+
+Without `just`: `WALLET_WHITELIST=0xYourAddress docker compose -f compose.local.yml up --build`.
+If the login app isn't built, the gateway serves a dependency-free fallback page (injected wallets
+only) so it still works.
+
+## Deploying on ROFL
+
+Do this from your **deployment repo** (this one only publishes the image). Prereqs: the
+[Oasis CLI](https://docs.oasis.io/build/tools/cli/), a funded account, and Docker. The gateway
+image and the Hermes images are all public.
+
+```bash
+oasis rofl init                       # generates rofl.yaml (set resources: mem 4096, cpus 2, disk 20000+)
+oasis rofl create --network testnet   # registers an app id on Sapphire
+oasis rofl build                      # validates compose + packs the bundle (images must be public)
+
+# secrets — encrypted into the manifest, only decrypt inside the attested TEE:
+openssl rand -hex 32 | tr -d '\n'       | oasis rofl secret set WALLET_SESSION_SECRET -
+echo -n "0xAddr1,0xAddr2"               | oasis rofl secret set WALLET_WHITELIST -
+echo -n "placeholder.invalid"           | oasis rofl secret set WALLET_DOMAIN -   # real host known only after deploy
+
+oasis rofl update                     # REQUIRED before deploy (pushes policy + secrets on-chain)
+oasis rofl deploy                     # rents a TDX machine and runs it
+
+# bind SIWE to the real proxy host (only known after the first deploy):
+oasis rofl machine show               # -> https://p8080.m<id>.<...>.rofl.app
+echo -n "p8080.m<id>.<...>.rofl.app"  | oasis rofl secret set WALLET_DOMAIN -
+oasis rofl update
+```
+
+`WALLET_DOMAIN` accepts a comma-separated set, so you can pre-seed a custom domain alongside the
+generated `*.rofl.app` host. Custom domain: point a DNS `A` + `TXT` record at the proxy per the
+[port-proxy docs](https://docs.oasis.io/build/rofl/features/proxy/).
+
+> Hermes needs at least one LLM provider key to actually *function* — it boots without one (so the
+> wallet gate is testable), but the agent is inert until you seed `~/.hermes/.env` / run its `setup`.
 
 ## Managing the allowlist
 
@@ -120,8 +144,8 @@ echo -n "0xAddr1,0xAddr2,0xAddr3" | oasis rofl secret set WALLET_WHITELIST -
 oasis rofl update
 ```
 
-Note: removing an address takes effect on **new** logins immediately, but an already-issued session
-cookie stays valid until it expires (`WALLET_SESSION_TTL`, default 12h). Lower the TTL for tighter
+Removing an address takes effect on **new** logins immediately, but an already-issued session cookie
+stays valid until it expires (`WALLET_SESSION_TTL`, default 12h). Lower the TTL for tighter
 revocation, or re-check the allowlist per request (a one-line change in `siwe.ts`/`server.ts`).
 
 ## Security notes
@@ -132,15 +156,40 @@ revocation, or re-check the allowlist per request (a one-line change in `siwe.ts
 - **Single gateway replica** assumed: the SIWE nonce store is in-memory. Scale-out needs a shared
   store (Redis `SETEX` + atomic `GETDEL`).
 - Replay protection is the **server-issued single-use nonce**, domain-binding is pinned from
-  `WALLET_DOMAIN` (not a client header), the verify endpoint is rate-limited and returns a generic
-  401 (no allowlist-vs-signature oracle), and the session cookie is `HttpOnly`/`SameSite=Lax`/`Secure`
+  `WALLET_DOMAIN` (not a client header), the verify endpoint returns a generic 401 (no
+  allowlist-vs-signature oracle), and the session cookie is `HttpOnly`/`SameSite=Lax`/`Secure`
   HMAC-signed.
 - `http-proxy` is battle-tested but in maintenance mode; `http-proxy-3` is a drop-in maintained fork
   if you prefer.
 
 ## Upgrade path
 
-Whitelist backend is one function (`is_allowed` in `gateway/src/siwe.ts`). Swap it for a DB table,
-ERC-721/1155 token-gating, or — to keep the roster **private and on-chain** — an Oasis **Sapphire
-confidential** allowlist queried with a TEE-derived key (gate the read path so membership can't be
-probed). See the architecture doc, §5.
+The whitelist backend is one function (`isAllowed` in `gateway/src/siwe.ts`). Swap it for a DB
+table, ERC-721/1155 token-gating, or — to keep the roster **private and on-chain** — an Oasis
+**Sapphire confidential** allowlist queried with a TEE-derived key (gate the read path so membership
+can't be probed). See [`docs/architecture.md`](./docs/architecture.md), §5.
+
+## Layout
+
+```
+login-app/          RainbowKit + wagmi login page (Vite/React) — injected + WalletConnect/mobile
+  src/App.tsx       Connect + SIWE sign-in flow
+  src/main.tsx      wagmi/RainbowKit providers
+  src/runtime.ts    reads window.__HERMES_GATE__ (gateway-injected chain id + WC project)
+gateway/            the wallet-auth reverse proxy (Node, runs .ts directly via type-stripping)
+  src/server.ts     http server: SIWE routes + serves the login app + gated reverse proxy + WS
+  src/siwe.ts       nonce store + EIP-4361 verify + allowlist (isAllowed)
+  src/session.ts    stateless HMAC-signed session cookie
+  src/static.ts     serves login-app/dist + injects runtime config into index.html
+  src/config.ts     env-driven config
+  src/login-page.ts dependency-free fallback page (used only if login-app isn't built)
+  Dockerfile        multi-stage build (native login-app build + amd64 runtime)
+compose.yaml        reference: gateway (published) + 2 stock Hermes services (internal) — copy to your deploy repo
+compose.local.yml   local smoke stack: gateway + mock upstream
+justfile            build / push / dev / smoke / check recipes
+docs/architecture.md  full design rationale
+```
+
+`rofl.yaml` is **not** in this repo — it's generated by `oasis rofl init` (and filled in by
+`oasis rofl create`/`update` with your app id, enclave hashes, and deployments). It's
+deployment-specific and gitignored.

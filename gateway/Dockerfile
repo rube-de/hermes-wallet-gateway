@@ -11,8 +11,8 @@ WORKDIR /login
 # Toolchain for optional native addons (bufferutil/utf-8-validate via ws/
 # WalletConnect). This stage is discarded — it does not affect the runtime image.
 RUN apk add --no-cache python3 make g++
-COPY login-app/package.json ./
-RUN npm install
+COPY login-app/package.json login-app/package-lock.json ./
+RUN npm ci
 COPY login-app/ ./
 # WalletConnect project id + SIWE chain id are baked at build time.
 ARG VITE_WC_PROJECT_ID=
@@ -26,8 +26,8 @@ RUN npm run build
 # what you read is what runs.
 FROM node:24-alpine
 WORKDIR /app
-COPY gateway/package.json ./
-RUN npm install --omit=dev && npm cache clean --force
+COPY gateway/package.json gateway/package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 COPY gateway/src ./src
 COPY --from=login-build /login/dist ./login-dist
 

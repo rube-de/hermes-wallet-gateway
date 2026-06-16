@@ -55,6 +55,7 @@ export interface GatewayConfig {
   domains: Set<string>;
   publicUrl: string;
   chainId: number;
+  wcProjectId: string;
   statement: string;
   sessionTtlSeconds: number;
   nonceTtlSeconds: number;
@@ -70,6 +71,9 @@ const config: GatewayConfig = {
   domains: new Set(domains),
   publicUrl: process.env.WALLET_PUBLIC_URL || `https://${domain}`,
   chainId: Number(process.env.WALLET_CHAIN_ID || 1),
+  // WalletConnect/Reown project id, injected into the login app at runtime so one
+  // built image serves any deployment (empty = WalletConnect/mobile QR disabled).
+  wcProjectId: process.env.WALLET_WC_PROJECT_ID || '',
   statement: process.env.WALLET_STATEMENT || 'Sign in to the Hermes dashboard.',
   sessionTtlSeconds: Number(process.env.WALLET_SESSION_TTL || 12 * 60 * 60),
   nonceTtlSeconds: Number(process.env.WALLET_NONCE_TTL || 5 * 60),

@@ -1,53 +1,72 @@
-# Compose for the ROFL app 
+# Reference Compose: how to run the wallet-gateway in front of a stock Hermes
+# stack. This repo does NOT deploy from here — copy this file into your own Hermes
+# deployment repo (next to the rofl.yaml that `oasis rofl init` generates) and
+# point the gateway `image:` at the image YOU built and pushed (see README).
 #
-# Three services on the default internal network:
-#   - wallet-gateway   : the ONLY service that publishes a port -> reachable via
-#                        the ROFL port proxy as public HTTPS.
-#   - hermes-dashboard : stock Hermes image, --insecure on the internal net,
-#                        NO published port. Only the gateway can reach it.
-#   - hermes-gateway   : stock Hermes messaging/agent runtime (the dashboard
-#                        reads its state). NO published port.
+# Trust boundary — three services on one internal network:
+#   wallet-gateway   the ONLY service with a published port. On ROFL it's exposed
+#                    as public HTTPS by the port proxy (TLS terminated in the TEE).
+#                    Runs SIWE + allowlist + session cookie, then reverse-proxies
+#                    authenticated traffic (incl. WebSockets) to the dashboard.
+#   hermes-dashboard stock Hermes image, NO published port -> not publicly
+#                    reachable. The gateway is the sole perimeter and enforces auth.
+#   hermes-gateway   stock Hermes agent runtime, NO published port.
 #
-# Hermes is published on Docker Hub as `nousresearch/hermes-agent` (ONE image,
-# run twice with different subcommands). ROFL needs a fully-qualified registry
-# host, so it must read `docker.io/nousresearch/hermes-agent`. Every service
-# needs a PUBLIC, pullable `image:` — ROFL cannot build from a `build:` block and
+# Images must be PUBLIC and pullable: ROFL cannot build from a `build:` block and
 # cannot authenticate to private registries. Pin by @sha256 for a reproducible
-# TEE bundle (dev uses :latest).
+# TEE bundle (dev may use :latest). Hermes ships on Docker Hub as
+# `nousresearch/hermes-agent` (ONE image, run twice with different subcommands);
+# ROFL requires the fully-qualified `docker.io/...` host.
 
 services:
   wallet-gateway:
+    # `build:` is used ONLY by local `docker compose build` (context = repo root
+    # so login-app/ compiles too). ROFL ignores it and pulls `image:` below.
     build:
       context: .
       dockerfile: gateway/Dockerfile
-      args:
-        VITE_WC_PROJECT_ID: ${VITE_WC_PROJECT_ID:-}
-        VITE_CHAIN_ID: ${WALLET_CHAIN_ID:-1}
-    image: ghcr.io/rube-de/hermes-wallet-gateway:latest
+    # The gateway image. Chain id + WalletConnect project are injected at RUNTIME
+    # (see env below), so ONE published image serves any deployment — no rebuild.
+    # The default is the maintainer's prebuilt image; set GATEWAY_IMAGE to your
+    # own only if you forked the gateway code.
+    image: ${GATEWAY_IMAGE:-ghcr.io/rube-de/hermes-wallet-gateway:latest}
     restart: unless-stopped
     depends_on:
       - hermes-dashboard
+    # Publishing this port is what the ROFL proxy exposes as
+    # https://p8080.m<id>.<...>.rofl.app (terminate-tls, the default mode):
+    # https://docs.oasis.io/build/rofl/features/proxy/
     ports:
       - "8080:8080"
     environment:
       - PORT=8080
       - HERMES_TARGET=http://hermes-dashboard:9119
-      - WALLET_CHAIN_ID=1
+      # SIWE chain the gateway verifies AND injects into the login app — change it
+      # here to switch chains, no rebuild.
+      - WALLET_CHAIN_ID=${WALLET_CHAIN_ID:-1}
+      # WalletConnect/Reown project id (mobile/QR), injected into the login app at
+      # runtime. Empty = WalletConnect disabled (injected wallets still work).
+      - WALLET_WC_PROJECT_ID=${WALLET_WC_PROJECT_ID:-}
       - WALLET_SESSION_TTL=43200
       - WALLET_STATEMENT=Sign in to the Hermes dashboard.
-      # --- the two ROFL secrets (injected as env by the TEE) ---
+      # --- secrets: on ROFL set these via `oasis rofl secret set` (the TEE injects
+      #     them as env); locally put them in a gitignored .env ---
       - WALLET_WHITELIST=${WALLET_WHITELIST}
       - WALLET_SESSION_SECRET=${WALLET_SESSION_SECRET}
-      # Set this to the proxy host AFTER first deploy (oasis rofl machine show),
-      # then `oasis rofl update`. Until then SIWE domain-binding can't be final.
+      # The public host SIWE binds to (anti-phishing, pinned server-side — not a
+      # client header). On ROFL you only learn it AFTER the first deploy
+      # (`oasis rofl machine show`), so set it then and `oasis rofl update`.
+      # Accepts a comma-separated set of hosts (e.g. apex + www).
       - WALLET_DOMAIN=${WALLET_DOMAIN}
 
   hermes-dashboard:
     image: docker.io/nousresearch/hermes-agent:latest
     restart: unless-stopped
-    # Bind to all interfaces on the internal network with the auth gate OFF
-    # (--insecure). Safe ONLY because there is no `ports:` entry -> not publicly
-    # reachable; the wallet-gateway is the sole perimeter and enforces auth.
+    # Bind to all interfaces on the internal network with the dashboard's own auth
+    # OFF (--insecure). Safe ONLY because there is no `ports:` entry -> not
+    # publicly reachable; the wallet-gateway is the sole perimeter. (--host
+    # 0.0.0.0 is required so the gateway, in a separate container, can reach it —
+    # loopback wouldn't work. 9119 is the dashboard's default port.)
     command: ["dashboard", "--host", "0.0.0.0", "--port", "9119", "--insecure", "--no-open", "--skip-build"]
     volumes:
       - hermes-data:/opt/data

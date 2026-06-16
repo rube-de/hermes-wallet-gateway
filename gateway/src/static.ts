@@ -30,10 +30,23 @@ export interface LoginStatic {
   index(res: ServerResponse): void;
 }
 
-export function makeLoginStatic(distDir: string): LoginStatic {
+// Config injected into the served index.html as window.__HERMES_GATE__, so the
+// login app reads chain id + WalletConnect project at runtime (not baked at build).
+export interface LoginRuntime {
+  chainId: number;
+  wcProjectId: string;
+}
+
+export function makeLoginStatic(distDir: string, runtime: LoginRuntime): LoginStatic {
   const resolvedDist = path.resolve(distDir);
   const indexPath = path.join(resolvedDist, 'index.html');
   const hasBuild = fs.existsSync(indexPath);
+  // Classic (non-module) inline <script> -> runs before the deferred app bundle.
+  // Escape '<' so a stray '</script>' in a value can't break out of the tag.
+  const injectTag = `<script>window.__HERMES_GATE__=${JSON.stringify(runtime).replace(
+    /</g,
+    '\\u003c',
+  )};</script>`;
 
   return {
     hasBuild,
@@ -64,7 +77,8 @@ export function makeLoginStatic(distDir: string): LoginStatic {
       });
     },
 
-    // Serve the SPA entry (no-store so a new build is picked up immediately).
+    // Serve the SPA entry (no-store so a new build is picked up immediately),
+    // with the runtime config injected into <head>.
     index(res) {
       fs.readFile(indexPath, (err, buf) => {
         if (err) {
@@ -72,11 +86,15 @@ export function makeLoginStatic(distDir: string): LoginStatic {
           res.end('login app not built');
           return;
         }
+        const html = buf.toString('utf8');
+        const withCfg = html.includes('</head>')
+          ? html.replace('</head>', injectTag + '</head>')
+          : injectTag + html;
         res.writeHead(200, {
           'content-type': 'text/html; charset=utf-8',
           'cache-control': 'no-store',
         });
-        res.end(buf);
+        res.end(withCfg);
       });
     },
   };

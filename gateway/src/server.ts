@@ -26,7 +26,10 @@ import { parseCookies, clientIp } from './util.ts';
 // The built React login app. Overridable via LOGIN_DIST (set in the image).
 const LOGIN_DIST =
   process.env.LOGIN_DIST || fileURLToPath(new URL('../../login-app/dist', import.meta.url));
-const loginStatic = makeLoginStatic(LOGIN_DIST);
+const loginStatic = makeLoginStatic(LOGIN_DIST, {
+  chainId: config.chainId,
+  wcProjectId: config.wcProjectId,
+});
 if (!loginStatic.hasBuild) {
   console.warn(`[gateway] login app not built at ${loginStatic.distDir}; serving fallback page.`);
   console.warn('[gateway] build it:  cd login-app && npm install && npm run build');

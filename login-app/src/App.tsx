@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useSignMessage } from 'wagmi';
 import { createSiweMessage } from 'viem/siwe';
+import { CHAIN_ID } from './runtime';
 
-// The SIWE chain assertion. Must match the gateway's WALLET_CHAIN_ID. This is
-// just an assertion in the signed message — the user does NOT have to be on
+// CHAIN_ID is the SIWE chain assertion (must match the gateway's WALLET_CHAIN_ID).
+// It's only an assertion in the signed message — the user does NOT have to be on
 // this network (personal_sign is chain-agnostic and costs nothing).
-const CHAIN_ID = Number(import.meta.env.VITE_CHAIN_ID || 1);
 const STATEMENT = 'Sign in to the Hermes dashboard.';
 
 export default function App() {

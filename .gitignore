@@ -28,6 +28,5 @@ Thumbs.db
 rofl.yaml
 rofl.*.yaml
 
-# Claude Code local state — keep only deliverables under .claude/files/
-.claude/*
-!.claude/files/
+# Claude Code local state
+.claude/
