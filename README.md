@@ -18,15 +18,7 @@ Full design rationale (in-tree-plugin alternative, Sapphire confidential-allowli
 
 ## Architecture
 
-```
-Internet --HTTPS--> ROFL port proxy (TLS in TEE) --> wallet-gateway  ← THIS REPO publishes this
-                                                       |  SIWE + allowlist + session cookie
-                                                       |  reverse-proxy + WebSocket passthrough
-                                                       v
-                                              hermes-dashboard  (stock image, internal net,
-                                                                 no public port)
-                                              hermes-gateway    (stock image, agent runtime)
-```
+![Hermes Wallet Gateway architecture](./docs/architecture.svg)
 
 - **wallet-gateway** (Node + [viem](https://viem.sh)) — the only public service; does the SIWE
   handshake, allowlist check, signed cookie, and transparently proxies authenticated traffic

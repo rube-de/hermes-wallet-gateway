@@ -1,0 +1,212 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1040" viewBox="0 0 1600 1040" role="img" aria-labelledby="title desc">
+  <title id="title">Hermes Wallet Gateway Architecture</title>
+  <desc id="desc">Retro-styled architecture diagram for the Hermes wallet-gated dashboard gateway, showing browser wallet login, ROFL TLS ingress, the wallet gateway, SIWE verification, runtime configuration, and private stock Hermes services.</desc>
+  <defs>
+    <style>
+      .bg { fill: #141820; }
+      .scan { fill: #202634; opacity: 0.42; }
+      .shadow { fill: #080a0f; }
+      .frame { fill: #1b2430; stroke: #f4b860; stroke-width: 3; }
+      .client { fill: #123436; stroke: #f4b860; stroke-width: 3; }
+      .proxy { fill: #193246; stroke: #66d9ef; stroke-width: 3; }
+      .gateway { fill: #143c35; stroke: #7ee787; stroke-width: 3; }
+      .secret { fill: #3a2419; stroke: #ffb86b; stroke-width: 3; }
+      .hermes { fill: #2b2447; stroke: #c792ea; stroke-width: 3; }
+      .build { fill: #342f18; stroke: #f9e26b; stroke-width: 3; }
+      .card { fill: #fff0cf; stroke: #080a0f; stroke-width: 2.5; }
+      .cardAlt { fill: #d7f7de; stroke: #080a0f; stroke-width: 2.5; }
+      .cardBlue { fill: #d7f0ff; stroke: #080a0f; stroke-width: 2.5; }
+      .cardPurple { fill: #eadcff; stroke: #080a0f; stroke-width: 2.5; }
+      .cardOrange { fill: #ffe0bd; stroke: #080a0f; stroke-width: 2.5; }
+      .title { font-family: monospace; font-size: 34px; font-weight: 700; fill: #fff0cf; }
+      .subtitle { font-family: monospace; font-size: 15px; font-weight: 400; fill: #9fb0c3; }
+      .section { font-family: monospace; font-size: 22px; font-weight: 700; fill: #fff0cf; }
+      .sectionDark { font-family: monospace; font-size: 22px; font-weight: 700; fill: #141820; }
+      .head { font-family: monospace; font-size: 18px; font-weight: 700; fill: #141820; }
+      .body { font-family: monospace; font-size: 13px; font-weight: 400; fill: #141820; }
+      .tiny { font-family: monospace; font-size: 11px; font-weight: 400; fill: #141820; }
+      .label { font-family: monospace; font-size: 12px; font-weight: 700; fill: #fff0cf; }
+      .muted { font-family: monospace; font-size: 12px; font-weight: 400; fill: #9fb0c3; }
+      .flow { fill: #66d9ef; }
+      .return { fill: #9fb0c3; }
+      .secure { fill: #ffb86b; }
+      .buildArrow { fill: #f9e26b; }
+      .internal { fill: #c792ea; }
+      .blackLine { fill: #080a0f; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1600" height="1040"/>
+  <rect class="scan" x="0" y="112" width="1600" height="2"/>
+  <rect class="scan" x="0" y="224" width="1600" height="2"/>
+  <rect class="scan" x="0" y="336" width="1600" height="2"/>
+  <rect class="scan" x="0" y="448" width="1600" height="2"/>
+  <rect class="scan" x="0" y="560" width="1600" height="2"/>
+  <rect class="scan" x="0" y="672" width="1600" height="2"/>
+  <rect class="scan" x="0" y="784" width="1600" height="2"/>
+  <rect class="scan" x="0" y="896" width="1600" height="2"/>
+
+  <text class="title" x="64" y="64">HERMES WALLET GATEWAY ARCHITECTURE</text>
+  <text class="subtitle" x="64" y="94">SIWE + address allowlist gateway in front of an unmodified stock Hermes dashboard.</text>
+
+  <!-- Main actors -->
+  <rect class="shadow" x="72" y="150" width="330" height="326"/>
+  <rect class="client" x="64" y="142" width="330" height="326"/>
+  <text class="section" x="88" y="178">USER BROWSER</text>
+  <text class="muted" x="88" y="202">public origin is SIWE domain</text>
+
+  <rect class="card" x="92" y="230" width="274" height="110"/>
+  <text class="head" x="112" y="260">React login app</text>
+  <text class="tiny" x="112" y="282">login-app/src/App.tsx</text>
+  <text class="body" x="112" y="306">RainbowKit + wagmi</text>
+  <text class="body" x="112" y="326">Builds EIP-4361 message</text>
+
+  <rect class="card" x="92" y="376" width="274" height="64"/>
+  <text class="head" x="112" y="402">Wallet</text>
+  <text class="body" x="112" y="424">Injected wallet or WalletConnect</text>
+
+  <rect class="shadow" x="458" y="224" width="240" height="198"/>
+  <rect class="proxy" x="450" y="216" width="240" height="198"/>
+  <text class="section" x="474" y="252">ROFL PROXY</text>
+  <text class="muted" x="474" y="280">public HTTPS URL</text>
+  <text class="muted" x="474" y="304">TLS terminates in TEE</text>
+  <text class="muted" x="474" y="328">forwards to port 8080</text>
+  <text class="muted" x="474" y="356">compose.yaml</text>
+
+  <rect class="shadow" x="744" y="136" width="800" height="704"/>
+  <rect class="frame" x="736" y="128" width="800" height="704"/>
+  <text class="section" x="760" y="164">ROFL APP / PODMAN INTERNAL NETWORK</text>
+  <text class="muted" x="760" y="190">Only wallet-gateway has a published port; Hermes services are private.</text>
+
+  <rect class="shadow" x="780" y="236" width="354" height="504"/>
+  <rect class="gateway" x="772" y="228" width="354" height="504"/>
+  <text class="section" x="796" y="264">WALLET-GATEWAY</text>
+  <text class="muted" x="796" y="288">gateway/src/server.ts</text>
+  <text class="muted" x="796" y="314">Node 24 + http-proxy + viem</text>
+
+  <rect class="cardAlt" x="800" y="356" width="298" height="72"/>
+  <text class="head" x="820" y="386">Serve login UI</text>
+  <text class="tiny" x="820" y="408">static.ts + fallback page</text>
+
+  <rect class="cardAlt" x="800" y="462" width="298" height="88"/>
+  <text class="head" x="820" y="492">SIWE endpoints</text>
+  <text class="tiny" x="820" y="514">GET /siwe/nonce</text>
+  <text class="tiny" x="820" y="536">POST /siwe/verify, /siwe/logout</text>
+
+  <rect class="cardAlt" x="800" y="580" width="298" height="66"/>
+  <text class="head" x="820" y="608">Session gate</text>
+  <text class="tiny" x="820" y="630">session.ts -> HMAC cookie</text>
+
+  <rect class="cardAlt" x="800" y="674" width="298" height="58"/>
+  <text class="head" x="820" y="704">Reverse proxy</text>
+  <text class="tiny" x="820" y="724">HTTP + WebSocket -> HERMES_TARGET</text>
+
+  <rect class="shadow" x="1198" y="236" width="306" height="236"/>
+  <rect class="secret" x="1190" y="228" width="306" height="236"/>
+  <text class="section" x="1218" y="264">RUNTIME CONFIG</text>
+  <text class="muted" x="1218" y="290">gateway/src/config.ts</text>
+  <text class="muted" x="1218" y="318">ROFL secrets / env vars</text>
+  <text class="muted" x="1218" y="342">WALLET_WHITELIST</text>
+  <text class="muted" x="1218" y="366">WALLET_SESSION_SECRET</text>
+  <text class="muted" x="1218" y="390">WALLET_DOMAIN</text>
+  <text class="muted" x="1218" y="414">WALLET_CHAIN_ID</text>
+  <text class="muted" x="1218" y="438">WALLET_WC_PROJECT_ID</text>
+
+  <rect class="shadow" x="1198" y="506" width="306" height="132"/>
+  <rect class="secret" x="1190" y="498" width="306" height="132"/>
+  <text class="section" x="1218" y="534">SIWE VERIFY</text>
+  <text class="muted" x="1218" y="560">gateway/src/siwe.ts</text>
+  <text class="muted" x="1218" y="588">nonce, domain, chain</text>
+  <text class="muted" x="1218" y="610">signature, allowlist</text>
+
+  <rect class="shadow" x="1198" y="676" width="306" height="78"/>
+  <rect class="hermes" x="1190" y="668" width="306" height="78"/>
+  <text class="section" x="1218" y="704">HERMES DASHBOARD</text>
+  <text class="muted" x="1218" y="730">stock image, internal :9119</text>
+
+  <rect class="shadow" x="1198" y="772" width="306" height="78"/>
+  <rect class="hermes" x="1190" y="764" width="306" height="78"/>
+  <text class="section" x="1218" y="800">HERMES GATEWAY</text>
+  <text class="muted" x="1218" y="826">stock agent runtime</text>
+
+  <rect class="cardPurple" x="982" y="764" width="144" height="78"/>
+  <text class="head" x="1018" y="796">Volume</text>
+  <text class="tiny" x="1012" y="818">hermes-data</text>
+
+  <!-- Build path -->
+  <rect class="shadow" x="72" y="558" width="626" height="286"/>
+  <rect class="build" x="64" y="550" width="626" height="286"/>
+  <text class="section" x="92" y="588">GATEWAY IMAGE BUILD PATH</text>
+  <text class="muted" x="92" y="614">One image; chain id and WalletConnect are injected at runtime.</text>
+
+  <rect class="card" x="92" y="650" width="152" height="86"/>
+  <text class="head" x="116" y="682">login-app/</text>
+  <text class="body" x="116" y="710">Vite React SPA</text>
+
+  <rect class="card" x="292" y="650" width="152" height="86"/>
+  <text class="head" x="316" y="682">dist/</text>
+  <text class="body" x="316" y="710">Static assets</text>
+
+  <rect class="card" x="492" y="650" width="152" height="86"/>
+  <text class="head" x="516" y="682">gateway image</text>
+  <text class="tiny" x="516" y="710">gateway/Dockerfile</text>
+
+  <rect class="card" x="92" y="770" width="552" height="42"/>
+  <text class="body" x="116" y="797">Local stack uses mock-dashboard through compose.local.yml.</text>
+
+  <!-- Block arrows: rectangles + triangles, no stroked path dependencies. -->
+  <rect class="flow" x="394" y="286" width="42" height="14"/>
+  <polygon class="flow" points="450,293 436,279 436,307"/>
+  <text class="label" x="404" y="270">HTTPS</text>
+
+  <rect class="flow" x="690" y="286" width="74" height="14"/>
+  <polygon class="flow" points="778,293 764,279 764,307"/>
+  <text class="label" x="694" y="270">:8080</text>
+
+  <rect class="secure" x="222" y="340" width="14" height="30"/>
+  <polygon class="secure" points="229,384 215,370 243,370"/>
+  <text class="label" x="248" y="362">PERSONAL_SIGN</text>
+
+  <rect class="return" x="408" y="440" width="364" height="12"/>
+  <polygon class="return" points="394,446 408,432 408,460"/>
+  <text class="label" x="430" y="474">NO COOKIE: SERVE LOGIN SPA</text>
+
+  <rect class="flow" x="394" y="516" width="392" height="14"/>
+  <polygon class="flow" points="800,523 786,509 786,537"/>
+  <text class="label" x="446" y="502">/SIWE/NONCE + /SIWE/VERIFY</text>
+
+  <rect class="secure" x="1126" y="350" width="50" height="14"/>
+  <polygon class="secure" points="1190,357 1176,343 1176,371"/>
+  <text class="label" x="1134" y="336">READS ENV</text>
+
+  <rect class="secure" x="1126" y="560" width="50" height="14"/>
+  <polygon class="secure" points="1190,567 1176,553 1176,581"/>
+  <text class="label" x="1122" y="546">VERIFY LOGIN</text>
+
+  <rect class="flow" x="1126" y="704" width="50" height="14"/>
+  <polygon class="flow" points="1190,711 1176,697 1176,725"/>
+  <text class="label" x="1122" y="690">HTTP + WS</text>
+
+  <rect class="internal" x="1336" y="746" width="14" height="18"/>
+  <polygon class="internal" points="1343,778 1329,764 1357,764"/>
+  <text class="muted" x="1362" y="760">Hermes internals</text>
+
+  <rect class="buildArrow" x="244" y="686" width="34" height="14"/>
+  <polygon class="buildArrow" points="292,693 278,679 278,707"/>
+  <rect class="buildArrow" x="444" y="686" width="34" height="14"/>
+  <polygon class="buildArrow" points="492,693 478,679 478,707"/>
+  <rect class="buildArrow" x="644" y="686" width="128" height="14"/>
+  <polygon class="buildArrow" points="786,693 772,679 772,707"/>
+  <text class="label" x="650" y="664">BUNDLED INTO GATEWAY</text>
+
+  <rect class="internal" x="1126" y="796" width="50" height="10"/>
+  <polygon class="internal" points="1190,801 1176,787 1176,815"/>
+  <rect class="internal" x="1138" y="784" width="10" height="18"/>
+
+  <!-- Runtime flow summary -->
+  <rect class="shadow" x="72" y="900" width="1472" height="92"/>
+  <rect class="cardBlue" x="64" y="892" width="1472" height="92"/>
+  <text class="head" x="92" y="926">PRIMARY RUNTIME FLOW</text>
+  <text class="body" x="92" y="952">1. Browser hits ROFL HTTPS. 2. Gateway serves login app when no signed cookie exists. 3. Wallet signs SIWE with a server nonce.</text>
+  <text class="body" x="92" y="974">4. Gateway verifies nonce, domain, chain, signature, and allowlist. 5. Signed cookie unlocks HTTP and WebSocket proxying to Hermes.</text>
+</svg>
