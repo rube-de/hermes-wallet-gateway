@@ -83,10 +83,11 @@ mechanism): GitHub → Packages → your package → *Change visibility → Publ
 | `WALLET_SESSION_TTL` | run | env | Session lifetime in seconds (default 43200 = 12h). |
 | `HERMES_TARGET` | run | env | Upstream dashboard URL (`http://hermes-dashboard:9119`). |
 | `COOKIE_SECURE` | run | env | `true` in prod (HTTPS); `false` only for local http. |
-| `VITE_WC_PROJECT_ID` / `VITE_CHAIN_ID` | build | `--build-arg` | **Fallback only** for `npm run dev` (no gateway in front). The runtime vars above take precedence. |
+| `VITE_WC_PROJECT_ID` / `VITE_CHAIN_ID` | dev | shell / `login-app/.env` | **`npm run dev` only** (no gateway to inject runtime config). Not used by the Docker image. |
 
-The login app reads runtime config first, then the baked `VITE_*` fallback, then defaults — so a
-plain `npm run dev` still works, and a deployed image is fully configured by env.
+The login app reads runtime config first, then `VITE_*` (only when there's no gateway in front,
+i.e. `npm run dev`), then defaults — so a plain `npm run dev` still works and a deployed image is
+fully configured by env.
 
 ## Local development
 
