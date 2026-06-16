@@ -14,11 +14,6 @@ services:
     build:
       context: .
       dockerfile: gateway/Dockerfile
-      args:
-        # Free id from https://cloud.reown.com — needed for WalletConnect/mobile.
-        # Injected wallets work without it.
-        VITE_WC_PROJECT_ID: ${VITE_WC_PROJECT_ID:-}
-        VITE_CHAIN_ID: ${WALLET_CHAIN_ID:-1}
     ports:
       - "8080:8080"
     environment:
@@ -30,8 +25,6 @@ services:
       - COOKIE_SECURE=false          # local http; production keeps this true
       - WALLET_CHAIN_ID=1
       # Runtime-injected WalletConnect id (mobile/QR); `just dev wc=<id>` sets it.
-      # (The VITE_WC_PROJECT_ID build arg above still bakes a fallback for the old
-      # `VITE_WC_PROJECT_ID=… docker compose up --build` flow.)
       - WALLET_WC_PROJECT_ID=${WALLET_WC_PROJECT_ID:-}
       - WALLET_SESSION_SECRET=local-dev-secret-not-for-production-0123456789abcdef
       # Override with your MetaMask address for a browser test:
