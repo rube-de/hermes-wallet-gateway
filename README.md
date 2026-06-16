@@ -1,5 +1,7 @@
 # Hermes Wallet Gateway
 
+![Hermes Wallet Gateway retro banner](./docs/banner.svg)
+
 A small, reusable **SIWE wallet-gate** you put in front of a stock
 [Hermes agent](https://github.com/nousresearch/hermes-agent) dashboard. Visitors sign in with
 their Ethereum wallet (Sign-In-With-Ethereum / EIP-4361); the gateway verifies the signature,

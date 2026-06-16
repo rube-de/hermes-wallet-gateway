@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="420" viewBox="0 0 1600 420" role="img" aria-labelledby="title desc">
+  <title id="title">Hermes Wallet Gateway Banner</title>
+  <desc id="desc">Retro banner for Hermes Wallet Gateway showing wallet sign-in, ROFL proxy, wallet gateway, and stock Hermes dashboard flow.</desc>
+  <defs>
+    <style>
+      .bg { fill: #141820; }
+      .scan { fill: #202634; opacity: 0.48; }
+      .shadow { fill: #07090d; }
+      .frame { fill: #1b2430; stroke: #f4b860; stroke-width: 3; }
+      .terminal { fill: #123436; stroke: #7ee787; stroke-width: 3; }
+      .proxy { fill: #193246; stroke: #66d9ef; stroke-width: 3; }
+      .gate { fill: #143c35; stroke: #7ee787; stroke-width: 3; }
+      .hermes { fill: #2b2447; stroke: #c792ea; stroke-width: 3; }
+      .chip { fill: #fff0cf; stroke: #080a0f; stroke-width: 2.5; }
+      .chipGreen { fill: #d7f7de; stroke: #080a0f; stroke-width: 2.5; }
+      .chipBlue { fill: #d7f0ff; stroke: #080a0f; stroke-width: 2.5; }
+      .titleText { font-family: monospace; font-size: 48px; font-weight: 700; fill: #fff0cf; }
+      .subtitle { font-family: monospace; font-size: 18px; font-weight: 400; fill: #9fb0c3; }
+      .label { font-family: monospace; font-size: 18px; font-weight: 700; fill: #141820; }
+      .small { font-family: monospace; font-size: 12px; font-weight: 400; fill: #141820; }
+      .lightLabel { font-family: monospace; font-size: 14px; font-weight: 700; fill: #fff0cf; }
+      .muted { font-family: monospace; font-size: 12px; font-weight: 400; fill: #9fb0c3; }
+      .flow { fill: #66d9ef; }
+      .secure { fill: #ffb86b; }
+      .accent { fill: #f9e26b; }
+      .purple { fill: #c792ea; }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1600" height="420"/>
+  <rect class="scan" x="0" y="56" width="1600" height="2"/>
+  <rect class="scan" x="0" y="112" width="1600" height="2"/>
+  <rect class="scan" x="0" y="168" width="1600" height="2"/>
+  <rect class="scan" x="0" y="224" width="1600" height="2"/>
+  <rect class="scan" x="0" y="280" width="1600" height="2"/>
+  <rect class="scan" x="0" y="336" width="1600" height="2"/>
+  <rect class="scan" x="0" y="392" width="1600" height="2"/>
+
+  <rect class="shadow" x="52" y="42" width="1496" height="330"/>
+  <rect class="frame" x="44" y="34" width="1496" height="330"/>
+
+  <text class="titleText" x="86" y="102">HERMES WALLET GATEWAY</text>
+  <text class="subtitle" x="90" y="138">SIWE wallet gate for stock Hermes dashboards on Oasis ROFL</text>
+
+  <rect class="shadow" x="92" y="184" width="264" height="112"/>
+  <rect class="terminal" x="84" y="176" width="264" height="112"/>
+  <rect class="chip" x="112" y="208" width="208" height="46"/>
+  <text class="label" x="132" y="237">WALLET SIGN-IN</text>
+  <text class="muted" x="112" y="274">EIP-4361 signed nonce</text>
+
+  <rect class="shadow" x="442" y="184" width="224" height="112"/>
+  <rect class="proxy" x="434" y="176" width="224" height="112"/>
+  <rect class="chipBlue" x="462" y="208" width="168" height="46"/>
+  <text class="label" x="496" y="237">ROFL TLS</text>
+  <text class="muted" x="462" y="274">public HTTPS proxy</text>
+
+  <rect class="shadow" x="748" y="158" width="318" height="164"/>
+  <rect class="gate" x="740" y="150" width="318" height="164"/>
+  <text class="lightLabel" x="772" y="184">wallet-gateway</text>
+  <rect class="chipGreen" x="772" y="204" width="254" height="40"/>
+  <text class="small" x="792" y="229">allowlist + HMAC session</text>
+  <rect class="chipGreen" x="772" y="254" width="254" height="40"/>
+  <text class="small" x="792" y="279">HTTP + WebSocket proxy</text>
+
+  <rect class="shadow" x="1150" y="184" width="314" height="112"/>
+  <rect class="hermes" x="1142" y="176" width="314" height="112"/>
+  <rect class="chip" x="1170" y="208" width="258" height="46"/>
+  <text class="label" x="1190" y="237">STOCK HERMES</text>
+  <text class="muted" x="1170" y="274">dashboard private on internal net</text>
+
+  <rect class="secure" x="320" y="228" width="94" height="18"/>
+  <polygon class="secure" points="434,237 414,217 414,257"/>
+  <text class="lightLabel" x="326" y="214">SIGN</text>
+
+  <rect class="flow" x="658" y="228" width="62" height="18"/>
+  <polygon class="flow" points="740,237 720,217 720,257"/>
+  <text class="lightLabel" x="662" y="214">:8080</text>
+
+  <rect class="flow" x="1058" y="228" width="64" height="18"/>
+  <polygon class="flow" points="1142,237 1122,217 1122,257"/>
+  <text class="lightLabel" x="1062" y="214">GATED</text>
+
+  <rect class="accent" x="90" y="318" width="420" height="14"/>
+  <rect class="flow" x="510" y="318" width="420" height="14"/>
+  <rect class="secure" x="930" y="318" width="250" height="14"/>
+  <rect class="purple" x="1180" y="318" width="310" height="14"/>
+  <text class="muted" x="92" y="350">public entrypoint -> SIWE verification -> signed cookie -> private Hermes</text>
+</svg>
