@@ -18,10 +18,13 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+concurrency:
+  group: publish-image-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-
 jobs:
   publish:
     runs-on: ubuntu-latest
