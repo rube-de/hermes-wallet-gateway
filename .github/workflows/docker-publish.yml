@@ -1,7 +1,7 @@
 name: publish-image
 
 # Builds and pushes the gateway image to GitHub Container Registry (GHCR) on
-# every merge to main (and on v* tags / manual dispatch). This mirrors the manual
+# every push to main (and on v* tags / manual dispatch). This mirrors the manual
 # `just push` recipe: chain id + WalletConnect project are RUNTIME config, so ONE
 # generic image serves every deployment — no build args, no per-deploy variants.
 #
