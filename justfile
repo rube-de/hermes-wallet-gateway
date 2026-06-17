@@ -32,9 +32,9 @@ dev wc="":
 down:
     docker compose -f compose.local.yml down
 
-# Headless SIWE checks (no browser, no Docker).
+# Headless checks (no browser, no Docker): SIWE flow + path routing + config validation.
 smoke:
-    cd gateway && npm ci && node test/run-local.ts
+    cd gateway && npm ci && npm test
 
 # Typecheck the login app (the gateway runs .ts directly, validated by `smoke`).
 check:

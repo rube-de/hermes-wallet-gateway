@@ -75,13 +75,47 @@ mechanism): GitHub → Packages → your package → *Change visibility → Publ
 | `WALLET_CHAIN_ID` | run | env | Chain the gateway verifies **and** injects into the login app. |
 | `WALLET_WC_PROJECT_ID` | run | env | WalletConnect/Reown project id (mobile/QR), injected into the login app. Empty = WalletConnect off (injected wallets still work). |
 | `WALLET_SESSION_TTL` | run | env | Session lifetime in seconds (default 43200 = 12h). |
-| `HERMES_TARGET` | run | env | Upstream dashboard URL (`http://hermes-dashboard:9119`). |
+| `HERMES_TARGET` | run | env | Catch-all upstream URL (`http://hermes-dashboard:9119`). Set empty for a routes-only gateway (unmatched paths → 502). |
+| `GATEWAY_ROUTES` | run | env / ROFL secret | Optional JSON `{ "/prefix": "http://upstream" }` map — fan out to extra upstreams by path prefix behind the same gate. See [Routing](#routing-multiple-upstreams-one-gate). |
 | `COOKIE_SECURE` | run | env | `true` in prod (HTTPS); `false` only for local http. |
 | `VITE_WC_PROJECT_ID` / `VITE_CHAIN_ID` | dev | shell / `login-app/.env` | **`npm run dev` only** (no gateway to inject runtime config). Not used by the Docker image. |
 
 The login app reads runtime config first, then `VITE_*` (only when there's no gateway in front,
 i.e. `npm run dev`), then defaults — so a plain `npm run dev` still works and a deployed image is
 fully configured by env.
+
+## Routing (multiple upstreams, one gate)
+
+By default every authenticated request is proxied to `HERMES_TARGET`. Set **`GATEWAY_ROUTES`** to
+fan out to additional upstreams *by URL path prefix*, so a second app can live behind the **same**
+wallet login on the same port:
+
+```bash
+GATEWAY_ROUTES='{"/security":"http://hermes-security-dashboard:3000"}'
+```
+
+- **One auth perimeter.** The SIWE session check runs **before** routing and applies to every
+  proxied path equally — an unauthenticated request to `/security` gets the same login challenge as
+  one to `/`. A route is never an auth bypass. The gateway's own endpoints (`/siwe/*`, the login
+  page and its `/__login/` assets, `/healthz`) are always served by the gateway, never proxied.
+- **Longest-prefix, boundary-aware match.** `/security` matches `/security` and `/security/...` but
+  **not** `/securityx`. The longest matching prefix wins; anything matching no prefix falls back to
+  `HERMES_TARGET`.
+- **No path rewrite.** The original request URL is forwarded **untouched** — the gateway never
+  strips the prefix. Each upstream must be **mounted at its own base path** (e.g. the security
+  dashboard is built with SvelteKit `paths.base = '/security'` so its asset/link URLs already carry
+  the prefix). This is the upstream image's responsibility (a build arg in *its* Dockerfile), not
+  the gateway's. Targets must be **bare origins** (`scheme://host[:port]`, no path) — a target with
+  its own path would be silently prepended, so the gateway rejects it at startup.
+- **WebSockets too.** Upgrade requests use the same routing table and the same auth.
+- **Fallback.** `HERMES_TARGET` is the catch-all. Leave it set (the default) and it backstops every
+  unrouted path; set it to an empty value for a routes-only gateway, where an unmatched path returns
+  `502` instead of being proxied. With `GATEWAY_ROUTES` unset, behavior is identical to a plain
+  single-target gateway.
+
+`WALLET_DOMAIN` stays **singular** — one public origin (`host:8080`) now fronts both apps, which is
+the whole point. Malformed `GATEWAY_ROUTES` (bad JSON, a prefix without a leading `/`, or a non-URL
+target) fails fast at startup with a clear error.
 
 ## Local development
 
@@ -173,6 +207,7 @@ login-app/          RainbowKit + wagmi login page (Vite/React) — injected + Wa
   src/runtime.ts    reads window.__HERMES_GATE__ (gateway-injected chain id + WC project)
 gateway/            the wallet-auth reverse proxy (Node, runs .ts directly via type-stripping)
   src/server.ts     http server: SIWE routes + serves the login app + gated reverse proxy + WS
+  src/routing.ts    longest-prefix, boundary-aware path → upstream matching (GATEWAY_ROUTES)
   src/siwe.ts       nonce store + EIP-4361 verify + allowlist (isAllowed)
   src/session.ts    stateless HMAC-signed session cookie
   src/static.ts     serves login-app/dist + injects runtime config into index.html

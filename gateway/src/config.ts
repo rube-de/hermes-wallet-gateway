@@ -4,6 +4,8 @@
 // which the TEE injects as env vars. For local dev they come from a .env file
 // loaded by `docker compose` (see ../../.env.example).
 
+import { normalizePrefix, type Route } from './routing.ts';
+
 function required(name: string): string {
   const v = (process.env[name] ?? '').trim();
   if (!v) {
@@ -11,6 +13,77 @@ function required(name: string): string {
     process.exit(1);
   }
   return v;
+}
+
+function fatal(message: string): never {
+  console.error(`FATAL: ${message}`);
+  process.exit(1);
+}
+
+// An upstream target must be a bare http/https ORIGIN (scheme://host[:port]) —
+// the request path is forwarded untouched, so a target carrying its own path,
+// query, or fragment would be silently prepended by http-proxy and break the
+// no-rewrite contract. Reject those at startup rather than mis-route at runtime.
+// Embedded credentials (userinfo) are also rejected: they'd leak into the startup
+// log (which prints targets) and aren't how upstreams authenticate here — use
+// headers instead.
+function isUpstreamUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  try {
+    const u = new URL(value);
+    return (
+      (u.protocol === 'http:' || u.protocol === 'https:') &&
+      (u.pathname === '/' || u.pathname === '') &&
+      u.search === '' &&
+      u.hash === '' &&
+      u.username === '' &&
+      u.password === ''
+    );
+  } catch {
+    return false;
+  }
+}
+
+// GATEWAY_ROUTES: a JSON object mapping a path prefix to an upstream URL, e.g.
+// {"/security":"http://hermes-security-dashboard:3000"}. Parsed and validated at
+// startup; any malformed JSON, non-object shape, bad prefix, or non-URL value is
+// fatal (fail fast). Unset/empty => no extra routes (legacy single-target mode).
+function parseRoutes(raw: string | undefined): Route[] {
+  if (raw === undefined || raw.trim() === '') return [];
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    fatal(`GATEWAY_ROUTES is not valid JSON: ${(err as Error).message}`);
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    fatal('GATEWAY_ROUTES must be a JSON object mapping "/prefix" -> "http://upstream".');
+  }
+
+  const routes: Route[] = [];
+  const seen = new Set<string>();
+  for (const [prefix, target] of Object.entries(parsed as Record<string, unknown>)) {
+    if (!prefix.startsWith('/')) {
+      fatal(`GATEWAY_ROUTES prefix ${JSON.stringify(prefix)} must start with "/".`);
+    }
+    if (!isUpstreamUrl(target)) {
+      fatal(
+        `GATEWAY_ROUTES target for ${JSON.stringify(prefix)} must be a bare http(s) origin ` +
+          `with no path (got ${JSON.stringify(target)}).`,
+      );
+    }
+    // Two keys can normalize to the same prefix ("/security" and "/security/").
+    // That would create equal-length, order-dependent routes — reject it rather
+    // than silently pick whichever JSON key came first.
+    const normalized = normalizePrefix(prefix);
+    if (seen.has(normalized)) {
+      fatal(`GATEWAY_ROUTES has duplicate prefix ${JSON.stringify(normalized)} (after normalization).`);
+    }
+    seen.add(normalized);
+    routes.push({ prefix: normalized, target });
+  }
+  return routes;
 }
 
 // The session-signing key. A STABLE secret is mandatory: a random per-process
@@ -50,7 +123,11 @@ const domain = domains[0];
 
 export interface GatewayConfig {
   port: number;
-  hermesTarget: string;
+  // The catch-all upstream for paths matching no GATEWAY_ROUTES prefix. Null
+  // only when HERMES_TARGET is set to an explicitly empty value (routes-only,
+  // no fallback) — an unmatched path then gets a 502 instead of being proxied.
+  hermesTarget: string | null;
+  routes: Route[];
   domain: string;
   domains: Set<string>;
   publicUrl: string;
@@ -64,9 +141,21 @@ export interface GatewayConfig {
   whitelist: Set<string>;
 }
 
+// HERMES_TARGET is the catch-all upstream. Unset => the historical default, so
+// with GATEWAY_ROUTES also unset every request still proxies here exactly as
+// before (back-compat). Set but empty => no catch-all (routes-only). Validated
+// as an http(s) origin when present, consistent with GATEWAY_ROUTES targets.
+const hermesTargetRaw = process.env.HERMES_TARGET;
+const hermesTarget =
+  hermesTargetRaw === undefined ? 'http://hermes-dashboard:9119' : hermesTargetRaw.trim() || null;
+if (hermesTarget !== null && !isUpstreamUrl(hermesTarget)) {
+  fatal(`HERMES_TARGET must be a bare http(s) origin with no path (got ${JSON.stringify(hermesTarget)}).`);
+}
+
 const config: GatewayConfig = {
   port: Number(process.env.PORT || 8080),
-  hermesTarget: process.env.HERMES_TARGET || 'http://hermes-dashboard:9119',
+  hermesTarget,
+  routes: parseRoutes(process.env.GATEWAY_ROUTES),
   domain,
   domains: new Set(domains),
   publicUrl: process.env.WALLET_PUBLIC_URL || `https://${domain}`,

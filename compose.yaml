@@ -40,7 +40,12 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
+      # Catch-all upstream for paths matching no GATEWAY_ROUTES prefix.
       - HERMES_TARGET=http://hermes-dashboard:9119
+      # Optional: fan out to extra upstreams by path prefix, behind the SAME
+      # wallet gate (one SIWE perimeter, one published port). Longest-prefix
+      # match, no path rewrite — each upstream is mounted at its own base path.
+      # - GATEWAY_ROUTES={"/security":"http://hermes-security-dashboard:3000"}
       # SIWE chain the gateway verifies AND injects into the login app — change it
       # here to switch chains, no rebuild.
       - WALLET_CHAIN_ID=${WALLET_CHAIN_ID:-1}

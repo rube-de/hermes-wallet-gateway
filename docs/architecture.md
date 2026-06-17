@@ -97,6 +97,62 @@ form POST that sets a cookie, not an HTTP Basic header) — not recommended for 
 
 ---
 
+## 2.5 Path-based routing: many upstreams, one gate
+
+The gateway can front **more than one** upstream while keeping exactly **one** SIWE auth perimeter.
+`GATEWAY_ROUTES` is a JSON object mapping a URL path prefix to an upstream origin:
+
+```
+GATEWAY_ROUTES={"/security":"http://hermes-security-dashboard:3000"}
+```
+
+```
+                       ┌───────────────────────── one SIWE gate ─────────────────────────┐
+  GET /            ───► │ session cookie check ─► route by longest path prefix:           │
+  GET /security/…  ───► │                          /security/* → security-dashboard:3000  │ ─► upstreams
+  WS  /api/pty     ───► │                          (else)      → HERMES_TARGET (catch-all) │
+  (no cookie)      ───► │ login challenge (served by the gateway; never proxied)           │
+                       └──────────────────────────────────────────────────────────────────┘
+```
+
+Rules (all enforced in `gateway/src/routing.ts` + `server.ts`):
+
+- **Auth before routing, uniformly.** The session-cookie check runs *before* the routing table and
+  applies to every proxied path. An unauthenticated request to `/security` gets the same login
+  challenge as one to `/` — a route can never become an auth bypass. The gateway's own endpoints
+  (`/siwe/nonce`, `/siwe/verify`, `/siwe/logout`, the login page + `/__login/` assets, `/healthz`)
+  are matched first and are always served by the gateway, never proxied.
+- **Longest-prefix, boundary-aware.** A prefix `/security` matches `/security` and `/security/...`
+  but **not** `/securityx` (the match only lands on a full path-segment boundary). The longest
+  matching prefix wins.
+- **No rewrite (contract).** The original request URL is forwarded to the chosen upstream
+  **untouched** — the prefix is never stripped. Each upstream must therefore be **mounted at its own
+  base path** (the security dashboard is built with SvelteKit `paths.base="/security"`, handled by a
+  build arg in *its* Dockerfile, not here). A code comment at the proxy call site documents this so
+  nobody "helpfully" adds prefix-stripping later, which would silently break every routed upstream.
+- **WebSockets use the same table.** The `upgrade` handler consults the same longest-prefix routing
+  and enforces the same auth, so existing WS upstreams (`/api/pty`, …) keep working and new ones
+  route correctly.
+- **Fallback / fail-safe.** `HERMES_TARGET` is the catch-all for any unmatched path; with
+  `GATEWAY_ROUTES` unset, behavior is byte-for-byte the legacy single-target gateway. Set
+  `HERMES_TARGET` empty for a routes-only gateway — an unmatched path then returns `502` rather than
+  hanging. Targets (both `HERMES_TARGET` and every `GATEWAY_ROUTES` value) must be **bare origins**
+  with no path — a path would be silently prepended and defeat the no-rewrite contract. Malformed
+  `GATEWAY_ROUTES` (bad JSON, a non-origin target, or a prefix without a leading `/`) is fatal at
+  startup.
+- **Implementation.** A single `http-proxy` instance with a per-request `{ target }` override
+  (`proxy.web(req, res, { target })` / `proxy.ws(req, socket, head, { target })`); no extra
+  dependency.
+
+**Trust model for routed write APIs.** Once `/security` is behind the gate, the security dashboard's
+write API (`POST /api/*`) is reachable by **any** logged-in wallet. That is intentional: the
+dashboard enforces its own `HERMES_API_TOKEN` bearer on writes, and the human SIWE session does not
+carry that token. The gateway must **not** special-case or strip `Authorization` headers for routed
+upstreams — it forwards them as-is. `WALLET_DOMAIN` stays **singular**: one public origin
+(`host:8080`) fronts both apps, so no SIWE/domain changes are needed.
+
+---
+
 ## 3. ROFL deployment (verified against official docs)
 
 | Concern | Finding | Source |
