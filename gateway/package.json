@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node src/server.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node test/run-local.ts"
+    "test": "node test/all.ts"
   },
   "dependencies": {
     "http-proxy": "^1.18.1",

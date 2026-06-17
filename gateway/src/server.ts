@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import httpProxy from 'http-proxy';
 
 import config from './config.ts';
+import { matchRoute } from './routing.ts';
 import { SESSION_COOKIE, verifySession, mintCookie, clearCookie } from './session.ts';
 import { issueNonce, verifyLogin } from './siwe.ts';
 import { makeLoginStatic } from './static.ts';
@@ -35,11 +36,26 @@ if (!loginStatic.hasBuild) {
   console.warn('[gateway] build it:  cd login-app && npm install && npm run build');
 }
 
+// One proxy instance; the upstream is chosen per-request via { target } (see
+// resolveTarget). ws + xfwd are instance options and are inherited by every
+// proxy.web / proxy.ws call.
 const proxy = httpProxy.createProxyServer({
-  target: config.hermesTarget,
   ws: true,
-  xfwd: true, // forward X-Forwarded-* so Hermes sees the real proto/host
+  xfwd: true, // forward X-Forwarded-* so the upstream sees the real proto/host
 });
+
+// Pick the upstream for a request path: the longest matching GATEWAY_ROUTES
+// prefix, else the HERMES_TARGET catch-all (null if none configured).
+//
+// NO-REWRITE CONTRACT: the matched path is forwarded to the upstream UNTOUCHED —
+// the gateway never strips or rewrites the route prefix. Each upstream is mounted
+// at its own base path (e.g. the security dashboard builds with SvelteKit
+// paths.base="/security"), which is what makes a shared origin work. Do NOT add
+// prefix-stripping here; it would silently break every routed upstream.
+function resolveTarget(pathname: string): string | null {
+  const route = matchRoute(pathname, config.routes);
+  return route ? route.target : config.hermesTarget;
+}
 
 proxy.on('error', (err: Error, _req: IncomingMessage, res: ServerResponse | Duplex) => {
   console.error('proxy error:', err.message);
@@ -158,25 +174,51 @@ const server = http.createServer(async (req: IncomingMessage, res: ServerRespons
   }
 
   // --- everything else: gated ---
+  // Auth runs BEFORE routing and applies uniformly: every proxied path shares
+  // the one SIWE perimeter, so a routed prefix is never an auth bypass — an
+  // unauthenticated request to /security gets the same login challenge as one to /.
   if (!sessionFrom(req)) {
     return serveLogin(res);
   }
-  proxy.web(req, res);
+  const target = resolveTarget(pathname);
+  if (!target) {
+    res.writeHead(502, { 'content-type': 'text/plain' });
+    return res.end('No upstream configured for this path.');
+  }
+  proxy.web(req, res, { target });
 });
 
 // WebSocket upgrades (Hermes dashboard: /api/pty, /api/ws, /api/pub, /api/events).
 // Browsers can't set Authorization on a WS upgrade, but they DO send cookies.
+// Same gate, same routing table as HTTP: auth first, then longest-prefix target
+// (no rewrite). No target -> destroy the socket (don't hang the upgrade).
 server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
   if (!sessionFrom(req)) {
     socket.destroy();
     return;
   }
-  proxy.ws(req, socket, head);
+  let pathname: string;
+  try {
+    pathname = new URL(req.url ?? '/', 'http://internal').pathname;
+  } catch {
+    socket.destroy();
+    return;
+  }
+  const target = resolveTarget(pathname);
+  if (!target) {
+    socket.destroy();
+    return;
+  }
+  proxy.ws(req, socket, head, { target });
 });
 
 server.listen(config.port, () => {
+  const catchAll = config.hermesTarget ?? '(no catch-all)';
+  const routeNote = config.routes.length
+    ? `, routes=${config.routes.map((r) => `${r.prefix}->${r.target}`).join(' ')}`
+    : '';
   console.log(
-    `hermes-wallet-gateway listening on :${config.port} -> ${config.hermesTarget} ` +
+    `hermes-wallet-gateway listening on :${config.port} -> ${catchAll}${routeNote} ` +
       `(domains=${[...config.domains].join(',')}, chainId=${config.chainId}, ${config.whitelist.size} allowed)`,
   );
 });

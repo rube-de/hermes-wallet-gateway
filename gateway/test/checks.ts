@@ -6,7 +6,7 @@ import { createSiweMessage } from 'viem/siwe';
 import type { Hex } from 'viem';
 
 // Hardhat dev account #0 — its address is whitelisted in the local configs.
-const WHITELISTED_PK = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' as Hex;
+export const WHITELISTED_PK = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' as Hex;
 // Hardhat dev account #1 — deliberately NOT whitelisted.
 const STRANGER_PK = '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d' as Hex;
 
@@ -41,7 +41,7 @@ interface LoginResult {
   cookie: string;
 }
 
-async function login(base: string, account: Account): Promise<LoginResult> {
+export async function login(base: string, account: Account): Promise<LoginResult> {
   const { message, signature } = await buildSigned(base, account);
   const v = await fetch(`${base}/siwe/verify`, {
     method: 'POST',
