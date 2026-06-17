@@ -80,6 +80,10 @@ failsFast('non-http scheme target → fail fast', { GATEWAY_ROUTES: JSON.stringi
 // Target carrying a path would be silently prepended by http-proxy (no-rewrite
 // contract) — must be a bare origin.
 failsFast('target with a path → fail fast', { GATEWAY_ROUTES: JSON.stringify({ '/security': 'http://s:3000/base' }) });
+// Target with embedded credentials would leak into the startup log.
+failsFast('target with userinfo → fail fast', { GATEWAY_ROUTES: JSON.stringify({ '/security': 'http://user:pass@s:3000' }) });
+// Two keys normalizing to the same prefix produce order-dependent routes.
+failsFast('duplicate normalized prefix → fail fast', { GATEWAY_ROUTES: JSON.stringify({ '/security': 'http://a:1', '/security/': 'http://b:2' }) });
 // Invalid HERMES_TARGET (catch-all) also fails fast.
 failsFast('invalid HERMES_TARGET → fail fast', { HERMES_TARGET: 'garbage' }, 'HERMES_TARGET');
 // HERMES_TARGET with a path also fails fast (same bare-origin rule).

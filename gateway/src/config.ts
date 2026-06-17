@@ -24,6 +24,9 @@ function fatal(message: string): never {
 // the request path is forwarded untouched, so a target carrying its own path,
 // query, or fragment would be silently prepended by http-proxy and break the
 // no-rewrite contract. Reject those at startup rather than mis-route at runtime.
+// Embedded credentials (userinfo) are also rejected: they'd leak into the startup
+// log (which prints targets) and aren't how upstreams authenticate here — use
+// headers instead.
 function isUpstreamUrl(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   try {
@@ -32,7 +35,9 @@ function isUpstreamUrl(value: unknown): value is string {
       (u.protocol === 'http:' || u.protocol === 'https:') &&
       (u.pathname === '/' || u.pathname === '') &&
       u.search === '' &&
-      u.hash === ''
+      u.hash === '' &&
+      u.username === '' &&
+      u.password === ''
     );
   } catch {
     return false;
@@ -57,6 +62,7 @@ function parseRoutes(raw: string | undefined): Route[] {
   }
 
   const routes: Route[] = [];
+  const seen = new Set<string>();
   for (const [prefix, target] of Object.entries(parsed as Record<string, unknown>)) {
     if (!prefix.startsWith('/')) {
       fatal(`GATEWAY_ROUTES prefix ${JSON.stringify(prefix)} must start with "/".`);
@@ -67,7 +73,15 @@ function parseRoutes(raw: string | undefined): Route[] {
           `with no path (got ${JSON.stringify(target)}).`,
       );
     }
-    routes.push({ prefix: normalizePrefix(prefix), target });
+    // Two keys can normalize to the same prefix ("/security" and "/security/").
+    // That would create equal-length, order-dependent routes — reject it rather
+    // than silently pick whichever JSON key came first.
+    const normalized = normalizePrefix(prefix);
+    if (seen.has(normalized)) {
+      fatal(`GATEWAY_ROUTES has duplicate prefix ${JSON.stringify(normalized)} (after normalization).`);
+    }
+    seen.add(normalized);
+    routes.push({ prefix: normalized, target });
   }
   return routes;
 }

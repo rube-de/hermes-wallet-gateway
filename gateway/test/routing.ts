@@ -143,7 +143,7 @@ check('GET /security (exact) → security upstream',
 
 // 3. Catch-all: an unrouted path goes to HERMES_TARGET (main), untouched.
 const r3 = await get('/api/pty', cookie);
-check('GET / (unrouted) → main upstream (catch-all)',
+check('GET /api/pty (unrouted) → main upstream (catch-all)',
   r3.status === 200 && r3.body === 'UPSTREAM=main GET /api/pty auth=-', JSON.stringify(r3));
 
 // 4. Boundary: "/securityx" must NOT match the "/security" prefix.
