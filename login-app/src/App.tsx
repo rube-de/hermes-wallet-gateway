@@ -44,7 +44,7 @@ export default function App() {
         credentials: 'same-origin',
       });
       if (res.ok) {
-        window.location.assign('/'); // session cookie set -> gateway proxies to Hermes
+        window.location.reload(); // stay on the requested path (e.g. /security/); the gate now proxies it
         return;
       }
       // The server returns a deliberately generic 401 for ANY verify failure
