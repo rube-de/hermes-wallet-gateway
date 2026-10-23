@@ -6,7 +6,7 @@
 # WITHOUT QEMU emulation when cross-building for amd64 — the output (dist/) is
 # static JS/HTML, architecture-independent, so it's safe to build on any arch.
 # Emulating this 4800-module build OOMs/kills buildkit; native keeps it fast.
-FROM --platform=$BUILDPLATFORM node:24-alpine AS login-build
+FROM --platform=$BUILDPLATFORM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS login-build
 WORKDIR /login
 # Toolchain for optional native addons (bufferutil/utf-8-validate via ws/
 # WalletConnect). This stage is discarded — it does not affect the runtime image.
@@ -22,7 +22,7 @@ RUN npm run build
 # --- stage 2: gateway runtime ---
 # node:24 runs TypeScript directly via built-in type stripping — no build step,
 # what you read is what runs.
-FROM node:24-alpine
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
 WORKDIR /app
 COPY gateway/package.json gateway/package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
