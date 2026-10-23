@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Base images in gateway/Dockerfile are pinned by digest, so a moved tag (e.g.
+  # a Node security release on node:24-alpine) becomes a PR instead of waiting
+  # for the next unrelated push to main.
+  - package-ecosystem: docker
+    directory: /gateway
+    schedule:
+      interval: daily
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      base-images:
+        patterns: ["*"]
+    ignore:
+      # Runtime major (node 24 → 26) is a deliberate upgrade, not a patch.
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
